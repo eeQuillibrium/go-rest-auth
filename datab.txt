@@ -1,0 +1,67 @@
+package repository
+
+import (
+	"database/sql"
+	"log"
+	"net/url"
+
+	auth "github.com/eeQuillibrium/go-rest-auth"
+	_ "github.com/lib/pq"
+)
+
+var psqlInfo string
+
+func checkData(db *sql.DB, user *auth.User) bool {
+	rows, err := db.Query("select 1 from authclients where login = '" + user.Login + "'and pass = '" + user.Password + "' limit 1;")
+	if err != nil {
+		log.Fatal(err)
+	}
+	var indicate int8
+	defer rows.Close()
+	rows.Next()
+	err = rows.Scan(&indicate)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return !(indicate != 0)
+}
+func sendData(db *sql.DB, user *auth.User) {
+	stmt, err := db.Prepare("INSERT INTO authclients VALUES( DEFAULT, $2, $3 )")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmt.Close()
+
+	if _, err := stmt.Exec(user.Login, user.Password); err != nil {
+		log.Fatal(err)
+	}
+}
+func StartBase(values *url.Values) {
+	db, err := sql.Open("postgres", psqlInfo)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = db.Ping()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	newUser := &auth.User{Login: values.Get("login"), Password: hasher(values.Get("pass"))}
+	if checkData(db, newUser) {
+		sendData(db, newUser)
+	}
+
+}
+
+package repository
+
+import (
+	"crypto/sha256"
+)
+
+func hasher(password string) string {
+	h := sha256.New()
+	h.Write([]byte(password))
+	return string(h.Sum(nil))
+}

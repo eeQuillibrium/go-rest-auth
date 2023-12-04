@@ -1,0 +1,1 @@
+migrate -path db/migrations "postgres://admin:root@localhost:5432/users?sslmode=disable" up
